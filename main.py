@@ -152,7 +152,7 @@ def main():
     
     
     
-    
+    '''
     # ===============================================================
     # 讀取 OU table, 得到初始的 Tile_time, num_Macro
     # ===============================================================
@@ -257,7 +257,7 @@ def main():
     logging.info(f"dump {file_name}")
     
     ############################################
-    
+    '''
    
 
 
@@ -765,14 +765,19 @@ def main():
     
 
     # 計算還沒 parallelize_OU_to_Macro 前的 Macro 數，同時是沒有乘以 K 的，at_least_num_Macro*K 應該要等於 parallelize_OU_to_Macro 內剛開始跑時的 total_macro_num = sum([sum(mywork.PE_num_Macro[i]) * Config.NETWORK_DICT["K"][i]  for i in range(Config.NETWORK_DICT["total_layer_num"])])
-    num_OU_without_compression = sum(\
-        [ math.ceil(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL)*Config.NETWORK_DICT["OUT_CH"][i] / mywork.OU)\
-        * math.ceil(Config.NETWORK_DICT["IN_CH"][i] * Config.NETWORK_DICT["K"][i]**2 / mywork.OU) for i in range(Config.NETWORK_DICT["total_layer_num"])])
+    num_OU_without_compression = [ math.ceil(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL)*Config.NETWORK_DICT["OUT_CH"][i] / mywork.OU)\
+        * math.ceil(Config.NETWORK_DICT["IN_CH"][i] * Config.NETWORK_DICT["K"][i]**2 / mywork.OU) for i in range(Config.NETWORK_DICT["total_layer_num"])]
+    logging.info(f"num_OU_without_compression of each layer = {num_OU_without_compression}")
+    logging.info(f"sum of num_OU_without_compression of each layer = {sum(num_OU_without_compression)}")
+
+
+    num_Macro_without_compression = int(math.ceil((sum(num_OU_without_compression)/mywork.num_OU_per_Macro)))
     
-    num_Macro_without_compression = int(math.ceil((num_OU_without_compression/mywork.num_OU_per_Macro)))
-    
-    at_least_num_Macro = sum(int(math.ceil(mywork.num_PE_OU_shape[layer_idx][PE_idx]/mywork.num_OU_per_Macro)) \
-        for PE_idx in range(Config.NETWORK_DICT["K"][layer_idx]) for layer_idx in range(Config.NETWORK_DICT["total_layer_num"]))
+    at_least_num_Macro = 0
+    for layer_idx in range(Config.NETWORK_DICT["total_layer_num"]):
+        for PE_idx in range(Config.NETWORK_DICT["K"][layer_idx]):
+            at_least_num_Macro += int(math.ceil(mywork.num_PE_OU_shape[layer_idx][PE_idx] / mywork.num_OU_per_Macro))
+
 
     Macro_compression_ratio = at_least_num_Macro / num_Macro_without_compression
     
@@ -784,23 +789,30 @@ def main():
 
 
     # 計算 unpruned vs pruned+Compression 的 energy 比較
-    energy_compression_ratio = sum([sum(haha) for haha in mywork.sum_of_PE_num_input_output_for_each_OU_shape]) / num_OU_without_compression
+    energy_compression_ratio = [sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i])/num_OU_without_compression[i] for i in range(Config.NETWORK_DICT["total_layer_num"])]
+    sum_of_unpruned_ADC_energy = sum([mywork.conv_energy_model.ADC_energy[i] / energy_compression_ratio[i] for i in range(Config.NETWORK_DICT["total_layer_num"])])
+    sum_of_unpruned_Shift_and_Add_energy = sum([mywork.conv_energy_model.Shift_and_Add_energy[i] / energy_compression_ratio[i] for i in range(Config.NETWORK_DICT["total_layer_num"])])
+    logging.info(f"mywork.conv_energy_model.Shift_and_Add_energy = {mywork.conv_energy_model.Shift_and_Add_energy}")
+    logging.info(f"energy_compression_ratio = {energy_compression_ratio}")
+
 
     logging.info(f"Unpruned")
-    logging.info(f"     ADC                                         : {sum_of_ADC_energy / energy_compression_ratio:>20}nJ")
-    logging.info(f"     Shift_and_Add                               : {sum_of_Shift_and_Add_energy / energy_compression_ratio:>20}nJ")
+    logging.info(f"     ADC                                         : {sum_of_unpruned_ADC_energy:>20}nJ")
+    logging.info(f"     Shift_and_Add                               : {sum_of_unpruned_Shift_and_Add_energy:>20}nJ")
     logging.info(f"     Overhead(OU_table + Add_and_Distributor)    : {0:>20}nJ")
     logging.info(f"     Else                                        : {(sum_of_Activation_energy + sum_of_Row_Buffers_energy + sum_of_Macro_energy + sum_of_SandH_energy + sum_of_Accumulator_energy + sum(mywork.pooling_energy_Model.Pooling_energy) + mywork.router_energy_model.total_energy_Router):>20}nJ")
-    Unpruned_total_energy = (sum_of_ADC_energy / energy_compression_ratio) + (sum_of_Shift_and_Add_energy / energy_compression_ratio) \
+    Unpruned_total_energy = sum_of_unpruned_ADC_energy + sum_of_unpruned_Shift_and_Add_energy \
         + (sum_of_Activation_energy + sum_of_Row_Buffers_energy + sum_of_Macro_energy + sum_of_SandH_energy + sum_of_Accumulator_energy + sum(mywork.pooling_energy_Model.Pooling_energy) + mywork.router_energy_model.total_energy_Router)
     logging.info(f"     total                                       : {Unpruned_total_energy:>20}nJ")
     
+
     logging.info(f"Pruned+Compression")
     logging.info(f"     ADC                                         : {sum_of_ADC_energy:>20}nJ")
     logging.info(f"     Shift_and_Add                               : {sum_of_Shift_and_Add_energy:>20}nJ")
     logging.info(f"     Overhead(OU_table + Add_and_Distributor)    : {(sum_of_which_OU_energy + sum_of_cluster_input_energy + sum_of_weight_bit_position_energy + sum_of_which_filter_energy) + (sum_of_Decoder_energy + sum_of_MUX_of_Shift_and_Add_energy + sum_of_Adder_mask_energy + sum_of_Add_energy + sum_of_MUX_of_filter_energy):>20}nJ")
     logging.info(f"     Else                                        : {(sum_of_Activation_energy + sum_of_Row_Buffers_energy + sum_of_Macro_energy + sum_of_SandH_energy + sum_of_Accumulator_energy + sum(mywork.pooling_energy_Model.Pooling_energy) + mywork.router_energy_model.total_energy_Router):>20}nJ")
     logging.info(f"     total                                       : {total_energy:>20}nJ")
+
 
     logging.info(f"save energy                                      :x{total_energy/Unpruned_total_energy:.3f}")
     

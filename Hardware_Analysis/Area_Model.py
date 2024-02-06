@@ -135,12 +135,33 @@ class CONV_Area_Model():
             # the bit resolution of a ReRAM cell. Therefore, storing col idx
             # is enough to represent both filter number and bit position of
             # the orignal DNN weight matrix.
+            
+            
+            # NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+            # self.which_OU_num[i]               = 0
+            # self.cluster_input_num[i]          = num_Macro_shared_for_PE * math.ceil(math.log(NUM_CLUSTER, 2)) / Config.BIT_PER_CELL / mywork.OU
+            # self.weight_bit_position_num[i]    = 0
+            # self.which_filter_num[i]           = num_Macro_shared_for_PE *  mywork.Tile_MAX_NUM_FILTER[i] \
+            #     * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL) * Config.NETWORK_DICT["OUT_CH"][i], 2) / Config.BIT_PER_CELL / mywork.OU
+            
+
+            
+            # 改成 BIT_PER_CELL 都用 2 來降低 Macro 數
+            # NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+            # self.which_OU_num[i]               = 0
+            # self.cluster_input_num[i]          = num_Macro_shared_for_PE * math.ceil(math.log(NUM_CLUSTER, 2)) / 2 / mywork.OU
+            # self.weight_bit_position_num[i]    = 0
+            # self.which_filter_num[i]           = num_Macro_shared_for_PE *  mywork.Tile_MAX_NUM_FILTER[i] \
+            #     * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/2) * Config.NETWORK_DICT["OUT_CH"][i], 2) / 2 / mywork.OU
+
+
+            
+            # 改成等效上總共多少 cell / (128*128) 得到 #Macro, 且 BIT_PER_CELL 都用 2
             NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
             self.which_OU_num[i]               = 0
-            self.cluster_input_num[i]          = num_Macro_shared_for_PE * math.ceil(math.log(NUM_CLUSTER, 2)) / Config.BIT_PER_CELL / mywork.OU
+            self.cluster_input_num[i]          = sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / 2 / (128**2)
             self.weight_bit_position_num[i]    = 0
-            self.which_filter_num[i]           = num_Macro_shared_for_PE *  mywork.Tile_MAX_NUM_FILTER[i] \
-                * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL) * Config.NETWORK_DICT["OUT_CH"][i], 2) / Config.BIT_PER_CELL / mywork.OU
+            self.which_filter_num[i]           = sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/2) * Config.NETWORK_DICT["OUT_CH"][i], 2) / 2 / (128**2)
             ###################
 
 
@@ -265,19 +286,41 @@ class CONV_Area_Model():
 
 
             # 每個 Macro 都 128x128 版本
-            self.which_OU_area[i]             = 0
-            NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
-            cluster_input_ADC_area = self.cluster_input_num[i] * Config.ADC[ (Config.BIT_PER_CELL, 1.28)]["area"]
-            cluster_input_Macro_area = self.cluster_input_num[i] * 128*128 *  Config.Macro[(0)]["device_area"] 
-            self.cluster_input_area[i]        = cluster_input_ADC_area + cluster_input_Macro_area
-    
-            self.weight_bit_position_area[i]  = 0
+#             self.which_OU_area[i]             = 0
+#             NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+#             cluster_input_ADC_area = self.cluster_input_num[i] * Config.ADC[ (Config.BIT_PER_CELL, 1.28)]["area"]
+#             cluster_input_Macro_area = self.cluster_input_num[i] * 128*128 *  Config.Macro[(0)]["device_area"] 
+#             self.cluster_input_area[i]        = cluster_input_ADC_area + cluster_input_Macro_area
+#     
+# 
+#             self.weight_bit_position_area[i]  = 0
+# 
+#             which_filter_ADC_area = self.which_filter_num[i] * Config.ADC[ (Config.BIT_PER_CELL, 1.28)]["area"]
+#             which_filter_Macro_area = self.which_filter_num[i] * 128*128 * Config.Macro[(0)]["device_area"]
+#             self.which_filter_area[i]         = which_filter_ADC_area + which_filter_Macro_area
 
-            which_filter_ADC_area = self.which_filter_num[i] * Config.ADC[ (Config.BIT_PER_CELL, 1.28)]["area"]
-            which_filter_Macro_area = self.which_filter_num[i] * 128*128 * Config.Macro[(0)]["device_area"]
-            self.which_filter_area[i]         = which_filter_ADC_area + which_filter_Macro_area
+
+
+            # 改成 BIT_PER_CELL 都用 2 來降低 Macro 數
+    #         self.which_OU_area[i]             = 0
+    #         NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+    #         cluster_input_ADC_area = self.cluster_input_num[i] * Config.ADC[ (2, 1.28)]["area"]
+    #         cluster_input_Macro_area = self.cluster_input_num[i] * 128*128 *  Config.Macro[(0)]["device_area"] 
+    #         self.cluster_input_area[i]        = cluster_input_ADC_area + cluster_input_Macro_area
+    # 
+    #         self.weight_bit_position_area[i]  = 0
+    #         
+    #         which_filter_ADC_area = self.which_filter_num[i] * Config.ADC[ (2, 1.28)]["area"]
+    #         which_filter_Macro_area = self.which_filter_num[i] * 128*128 * Config.Macro[(0)]["device_area"]
+    #         self.which_filter_area[i]         = which_filter_ADC_area + which_filter_Macro_area
 
             
+            # 改成等效上總共多少 cell / (128*128) 得到 #Macro, 且 BIT_PER_CELL 都用 2
+            NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+            self.which_OU_area[i]               = 0
+            self.cluster_input_area[i]          = self.cluster_input_num[i] * (Config.ADC[ (2, 1.28)]["area"] + 128**2 * Config.Macro[(0)]["device_area"])
+            self.weight_bit_position_area[i]    = 0
+            self.which_filter_area[i]           = self.which_filter_num[i] * (Config.ADC[ (2, 1.28)]["area"] + 128**2 * Config.Macro[(0)]["device_area"])
 
 
             ###################

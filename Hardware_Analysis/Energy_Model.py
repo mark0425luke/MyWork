@@ -113,12 +113,21 @@ class CONV_Energy_Model():
 
 
             # V4
+            # NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
+            # self.which_OU_switch_cycle[i]               = 0
+            # self.cluster_input_switch_cycle[i]          = how_many_pixel                * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / Config.BIT_PER_CELL
+            # self.weight_bit_position_switch_cycle[i]    = 0
+            # self.which_filter_switch_cycle[i]           = how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * mywork.Tile_MAX_NUM_FILTER[i] \
+            #     * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL) * Config.NETWORK_DICT["OUT_CH"][i], 2) / Config.BIT_PER_CELL
+
+
+            # 改成 BIT_PER_CELL 都用 2 來降低 Macro 數
             NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
             self.which_OU_switch_cycle[i]               = 0
-            self.cluster_input_switch_cycle[i]          = how_many_pixel                * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / Config.BIT_PER_CELL
+            self.cluster_input_switch_cycle[i]          = how_many_pixel                * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / 2
             self.weight_bit_position_switch_cycle[i]    = 0
             self.which_filter_switch_cycle[i]           = how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * mywork.Tile_MAX_NUM_FILTER[i] \
-                * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL) * Config.NETWORK_DICT["OUT_CH"][i], 2) / Config.BIT_PER_CELL
+                * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/2) * Config.NETWORK_DICT["OUT_CH"][i], 2) / 2
 
             ###################
 
@@ -232,10 +241,17 @@ class CONV_Energy_Model():
 
 
             # V4
+            # self.which_OU_energy[i]              = 0
+            # self.cluster_input_energy[i]         = self.cluster_input_switch_cycle[i]       * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(Config.BIT_PER_CELL, 1.28)]["power"] * Config.CLK_PERIOD)
+            # self.weight_bit_position_energy[i]   = 0
+            # self.which_filter_energy[i]          = self.which_filter_switch_cycle[i]        * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(Config.BIT_PER_CELL, 1.28)]["power"] * Config.CLK_PERIOD)
+
+
+            # 改成 BIT_PER_CELL 都用 2 來降低 Macro 數
             self.which_OU_energy[i]              = 0
-            self.cluster_input_energy[i]         = self.cluster_input_switch_cycle[i]       * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(Config.BIT_PER_CELL, 1.28)]["power"] * Config.CLK_PERIOD)
+            self.cluster_input_energy[i]         = self.cluster_input_switch_cycle[i]       * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(2, 1.28)]["power"] * Config.CLK_PERIOD)
             self.weight_bit_position_energy[i]   = 0
-            self.which_filter_energy[i]          = self.which_filter_switch_cycle[i]        * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(Config.BIT_PER_CELL, 1.28)]["power"] * Config.CLK_PERIOD)
+            self.which_filter_energy[i]          = self.which_filter_switch_cycle[i]        * (Config.Macro[(0)]["device_power"] * Config.Macro[(0)]["crossbar_read_latency"] + Config.ADC[(2, 1.28)]["power"] * Config.CLK_PERIOD)
 
             ###################
             
