@@ -152,7 +152,7 @@ def main():
     
     
     
-    '''
+    
     # ===============================================================
     # 讀取 OU table, 得到初始的 Tile_time, num_Macro
     # ===============================================================
@@ -257,7 +257,7 @@ def main():
     logging.info(f"dump {file_name}")
     
     ############################################
-    '''
+    
    
 
 
@@ -769,6 +769,10 @@ def main():
         * math.ceil(Config.NETWORK_DICT["IN_CH"][i] * Config.NETWORK_DICT["K"][i]**2 / mywork.OU) for i in range(Config.NETWORK_DICT["total_layer_num"])]
     logging.info(f"num_OU_without_compression of each layer = {num_OU_without_compression}")
     logging.info(f"sum of num_OU_without_compression of each layer = {sum(num_OU_without_compression)}")
+
+    sum_of_num_cell = sum([ math.ceil(math.ceil(Config.NETWORK_DICT["BIT_W"]/Config.BIT_PER_CELL)*Config.NETWORK_DICT["OUT_CH"][i])\
+        * math.ceil(Config.NETWORK_DICT["IN_CH"][i] * Config.NETWORK_DICT["K"][i]**2) for i in range(Config.NETWORK_DICT["total_layer_num"])])
+    logging.info(f"sum_of_num_cell = {sum_of_num_cell}")
 
 
     num_Macro_without_compression = int(math.ceil((sum(num_OU_without_compression)/mywork.num_OU_per_Macro)))
