@@ -24,6 +24,7 @@ class CONV_Energy_Model():
         self.Add_switch_cycle                    = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Adder_mask_switch_cycle             = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.MUX_of_filter_switch_cycle          = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
+        self.OR_switch_cycle                     = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Accumulator_switch_cycle            = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
 
 
@@ -43,6 +44,7 @@ class CONV_Energy_Model():
         self.Add_energy                    = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Adder_mask_energy             = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.MUX_of_filter_energy          = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
+        self.OR_energy                     = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Accumulator_energy            = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
 
 
@@ -149,9 +151,9 @@ class CONV_Energy_Model():
 
             
             
-            self.OU_switch_cycle[i]            =                                  how_many_pixel                * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]                
-            self.SandH_switch_cycle[i]         = Config.NETWORK_DICT["BIT_IFM"] * how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]                
-            self.ADC_switch_cycle[i]           = Config.NETWORK_DICT["BIT_IFM"] * how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i] 
+            self.OU_switch_cycle[i]            =                                  how_many_pixel                * sum(mywork.sum_of_PE_num_cluster_types_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]                
+            self.SandH_switch_cycle[i]         = Config.NETWORK_DICT["BIT_IFM"] * how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_cluster_types_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]                
+            self.ADC_switch_cycle[i]           = Config.NETWORK_DICT["BIT_IFM"] * how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_cluster_types_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i] 
             self.Shift_and_Add_switch_cycle[i] = Config.NETWORK_DICT["BIT_IFM"] * how_many_pixel * mywork.OU    * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i] 
 
 
@@ -192,7 +194,11 @@ class CONV_Energy_Model():
             self.MUX_of_Shift_and_Add_switch_cycle[i]   =   how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
             self.Adder_mask_switch_cycle[i]             =   how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
             self.Add_switch_cycle[i]                    =   how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
-            self.MUX_of_filter_switch_cycle[i]          =   how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
+             # MUX_of_filter 拿掉了，因為改成 OR
+            # self.MUX_of_filter_switch_cycle[i]          =   how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
+            self.MUX_of_filter_switch_cycle[i]          = 0
+            self.OR_switch_cycle[i]                      = how_many_pixel * mywork.OU * sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * Config.NETWORK_DICT["K"][i]
+                       
             ###################
 
             
@@ -321,6 +327,7 @@ class CONV_Energy_Model():
             self.MUX_of_filter_energy[i]            = self.MUX_of_filter_switch_cycle[i]                 * Config.CLK_PERIOD * Config.Mux_base[(Config.CLK_PERIOD, Config.NETWORK_DICT["OUT_CH"][i],\
                 math.ceil(math.log(Config.NETWORK_DICT["IN_CH"][i]*(Config.NETWORK_DICT["K"][i]**2),2))+Config.NETWORK_DICT["BIT_IFM"]+Config.NETWORK_DICT["BIT_W"]-1)]["power"]
             
+            self.OR_energy[i]                       = self.OR_switch_cycle[i]                           * Config.CLK_PERIOD * Config.OR_base[(Config.CLK_PERIOD, Config.MAX_num_Macro_per_Tile, 29)]["power"]
             ###################
 
             
@@ -336,7 +343,7 @@ class CONV_Energy_Model():
                 + self.which_OU_energy[i] + self.cluster_input_energy[i] + self.weight_bit_position_energy[i] + self.which_filter_energy[i] \
                 + self.OU_energy[i] \
                 + self.SandH_energy[i] + self.ADC_energy[i] + self.Shift_and_Add_energy[i]\
-                + self.Decoder_energy[i] + self.MUX_of_Shift_and_Add_energy[i] +self.Add_energy[i] + self.Adder_mask_energy[i] + self.MUX_of_filter_energy[i]\
+                + self.Decoder_energy[i] + self.MUX_of_Shift_and_Add_energy[i] +self.Add_energy[i] + self.Adder_mask_energy[i] + self.MUX_of_filter_energy[i] + self.OR_energy[i]\
                 + self.Accumulator_energy[i]
 
             ###################
@@ -387,7 +394,9 @@ class CONV_Energy_Model():
             logger.info(f"                                      energy          = {self.Add_energy[i]:>20}")
             logger.info(f"           MUX_of_filter              switch_cycle = {self.MUX_of_filter_switch_cycle[i]:>20}")
             logger.info(f"                                      energy = {self.MUX_of_filter_energy[i]:>20}")
-            logger.info(f"            Add and Distributor energy = {self.Decoder_energy[i] + self.MUX_of_Shift_and_Add_energy[i] + self.Adder_mask_energy[i] +  +self.Add_energy[i] + self.MUX_of_filter_energy[i]:>20}nJ")
+            logger.info(f"           OR                         switch_cycle = {self.OR_switch_cycle[i]:>20}")
+            logger.info(f"                                      energy = {self.OR_energy[i]:>20}")
+            logger.info(f"            Add and Distributor energy = {self.Decoder_energy[i] + self.MUX_of_Shift_and_Add_energy[i] + self.Adder_mask_energy[i] +  +self.Add_energy[i] + self.MUX_of_filter_energy[i] + self.OR_energy[i]:>20}nJ")
        
             
 
@@ -462,7 +471,7 @@ class Router_Energy_Model():
         
         for i in range(Config.NETWORK_DICT["total_layer_num"] - 1):
             curConv_inner_switch_cycle            = Config.NETWORK_DICT["OUT_CH"][i] * (Config.NETWORK_DICT["OFM_row"][i]**2) * mywork.router_area_model.intra_CONV_Router_num[i]
-            curConv_to_nextCONV_switch_cycle       = 1 # 先假設 1 就好，實際要跑 QAP 
+            curConv_to_nextCONV_switch_cycle       = 1 # 假設 1 就好，實際跑 QAP 也是 router energy 很小，更何況 Tile 個數不多 
             nextCONV_inner_switch_cycle          = Config.NETWORK_DICT["OUT_CH"][i+1] * (Config.NETWORK_DICT["OFM_row"][i+1]**2) * mywork.router_area_model.intra_CONV_Router_num[i+1]
 
             self.Router_switch_cycle += (   curConv_inner_switch_cycle \

@@ -35,6 +35,7 @@ class CONV_Area_Model():
         self.Add_num                    = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Adder_mask_num             = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.MUX_of_filter_num          = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
+        self.OR_num                     = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Accumulator_num            = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
 
 
@@ -54,6 +55,7 @@ class CONV_Area_Model():
         self.Add_area                    = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Adder_mask_area             = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.MUX_of_filter_area          = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
+        self.OR_area                     = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
         self.Accumulator_area            = [0 for i in range(Config.NETWORK_DICT["total_layer_num"])] 
 
 
@@ -159,9 +161,9 @@ class CONV_Area_Model():
             # 改成等效上總共多少 cell / (128*128) 得到 #Macro, 且 BIT_PER_CELL 都用 2
             NUM_CLUSTER = math.ceil(Config.NETWORK_DICT["K"][i]*Config.NETWORK_DICT["IN_CH"][i] / mywork.OU)
             self.which_OU_num[i]               = 0
-            self.cluster_input_num[i]          = sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / 2 / (128**2)
+            self.cluster_input_num[i]          = int(math.ceil(sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.ceil(math.log(NUM_CLUSTER, 2)) / 2 / (128**2)))
             self.weight_bit_position_num[i]    = 0
-            self.which_filter_num[i]           = sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/2) * Config.NETWORK_DICT["OUT_CH"][i], 2) / 2 / (128**2)
+            self.which_filter_num[i]           = int(math.ceil(sum(mywork.sum_of_PE_num_input_output_for_each_OU_shape[i]) * math.log(math.ceil(Config.NETWORK_DICT["BIT_W"]/2) * Config.NETWORK_DICT["OUT_CH"][i], 2) / 2 / (128**2)))
             ###################
 
 
@@ -207,7 +209,10 @@ class CONV_Area_Model():
             self.MUX_of_Shift_and_Add_num[i]    = sum([math.ceil(mywork.PE_num_Macro[i][j]/Config.NETWORK_DICT["BIT_IFM"]) for j in range(Config.NETWORK_DICT["K"][i])]) * Config.NETWORK_DICT["K"][i]
             self.Adder_mask_num[i]              = mywork.num_Tile[i] * (Config.NETWORK_DICT["K"][i]**2)
             self.Add_num[i]                     = sum([math.ceil(mywork.PE_num_Macro[i][j]/Config.NETWORK_DICT["BIT_IFM"]) for j in range(Config.NETWORK_DICT["K"][i])]) * Config.NETWORK_DICT["K"][i]
-            self.MUX_of_filter_num[i]           = sum([math.ceil(mywork.PE_num_Macro[i][j]/Config.NETWORK_DICT["BIT_IFM"]) for j in range(Config.NETWORK_DICT["K"][i])]) * Config.NETWORK_DICT["K"][i]
+            # MUX_of_filter 拿掉了，因為改成 OR
+            # self.MUX_of_filter_num[i]           = sum([math.ceil(mywork.PE_num_Macro[i][j]/Config.NETWORK_DICT["BIT_IFM"]) for j in range(Config.NETWORK_DICT["K"][i])]) * Config.NETWORK_DICT["K"][i]
+            self.MUX_of_filter_num[i]           = 0
+            self.OR_num[i]                     = mywork.num_Tile[i] * Config.NETWORK_DICT["OUT_CH"][i] * (Config.NETWORK_DICT["K"][i]**2)
             
             ###################
 
@@ -382,6 +387,7 @@ class CONV_Area_Model():
             self.MUX_of_filter_area[i] = self.MUX_of_filter_num[i] * Config.Mux_base[(Config.CLK_PERIOD, Config.NETWORK_DICT["OUT_CH"][i],\
                 math.ceil(math.log(Config.NETWORK_DICT["IN_CH"][i]*(Config.NETWORK_DICT["K"][i]**2),2))+Config.NETWORK_DICT["BIT_IFM"]+Config.NETWORK_DICT["BIT_W"]-1)]["area"]
 
+            self.OR_area[i] = self.OR_num[i]  * Config.OR_base[(Config.CLK_PERIOD, Config.MAX_num_Macro_per_Tile, 29)]["area"]
             ###################
         
 
@@ -395,7 +401,7 @@ class CONV_Area_Model():
                 + self.which_OU_area[i] + self.cluster_input_area[i] + self.weight_bit_position_area[i] + self.which_filter_area[i] \
                 + self.Macro_area[i] \
                 + self.SandH_area[i] + self.ADC_area[i] + self.Shift_and_Add_area[i]\
-                + self.Decoder_area[i] +self.MUX_of_Shift_and_Add_area[i] + self.Adder_mask_area[i] + self.Add_area[i] + self.MUX_of_filter_area[i]\
+                + self.Decoder_area[i] +self.MUX_of_Shift_and_Add_area[i] + self.Adder_mask_area[i] + self.Add_area[i] + self.MUX_of_filter_area[i] + self.OR_area[i]\
                 + self.Accumulator_area[i]
 
             ###################
@@ -449,7 +455,9 @@ class CONV_Area_Model():
             logger.info(f"                                    area ={self.Adder_mask_area[i]:>20}um^2")
             logger.info(f"           MUX_of_filter            num = {self.MUX_of_filter_num[i]:>20}")
             logger.info(f"                                    area = {self.MUX_of_filter_area[i]:>20}")
-            logger.info(f"           Add and Distributor area = {self.Decoder_area[i] +self.MUX_of_Shift_and_Add_area[i] + self.Adder_mask_area[i] + self.Add_area[i] + self.MUX_of_filter_area[i]}")
+            logger.info(f"           OR                       num = {self.OR_num[i]:>20}")
+            logger.info(f"                                    area = {self.OR_area[i]:>20}")
+            logger.info(f"           Add and Distributor area = {self.Decoder_area[i] +self.MUX_of_Shift_and_Add_area[i] + self.Adder_mask_area[i] + self.Add_area[i] + self.MUX_of_filter_area[i] + self.OR_area[i]}")
 
 
             logger.info(f"    Accumulator             num           = {self.Accumulator_num[i]:>20}")

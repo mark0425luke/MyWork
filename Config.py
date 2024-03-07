@@ -1,20 +1,46 @@
+import logging
 
 
+# ===============================================================
+# 檔案設定
+# =============================================================== 
+# home 目錄設定
+home_dir = "/home/mark/MyWork/"
 
+# logfile 設定
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Prints log messages to the terminal
+        logging.FileHandler('./Report/logfile.txt', mode='w')  # Saves log messages to a file
+    ]
+)
+############################################
+
+
+# ===============================================================
+# 硬體設定
+# =============================================================== 
 CLK_PERIOD =  0.78125 # 0.78125(因為1/1.28), 3.125, 4.6875, 7.8125, 14.0625, 26.5625 # 10 # 單位 : ns
 ADC_GSps = 1.28
 LATENCY = (5.882*1e+06 / CLK_PERIOD )# 單位 : 幾個 cycle, ex. 10ms / 3.125 = 10*1e+06 ns / 3.125 ns = 3200000 cycles 
 # OU = [2, 4, 8, 16, 32]
-OU = 2
+OU = 32
 Mux_base_Small_input = 32
 # Add_and_Distributor_Small_input = 16
 XB_paramX = 128
 BIT_DAC = 1
 BIT_PER_CELL = 2
 MAX_num_Macro_per_Tile = 16 # 這邊是因為 Add and Distributor 那邊的 Add 最多能吃 16 input 訂的
+############################################
 
 
 
+
+# ===============================================================
+# Network 設定
+# =============================================================== 
 # block_middle_time 指的是 最後一層 convolution 在算的時候 Tile 得出一組 OFM rows 的次數
 # ex. CONV11 算 OFM row : [[1,2,3], [4,5,6], [7,8,9], [10,11,12], [13,14]] 總共 5 個 block
 # 然後因為 padding 關係，所以相當於 CONV12 IFM row 的 [[2,3,4], [4,5,6].... ，另外最後一個 row 也有 padding
@@ -49,9 +75,15 @@ NETWORK_DICT = { \
     # "SRAM_NUM_WORD" : [256, 1024, 512, 1024, 512, 1024, 1024, 512, 1024, 1024, 512, 512, 512], \
     # "SRAM_WIDTH"    : [8, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16] \
 }
+############################################
 
 
 
+
+
+# ===============================================================
+# Hardware 的 area 跟 power
+# =============================================================== 
 # area 單位是 um^2
 # power 單位是 1W
 
@@ -379,6 +411,19 @@ Decoder ={
 
 
 # CLK_PERIOD, NUM_INPUT, BIT
+OR_base = {
+
+    # (0.78125, 8, 21)   : {'area': 176.90, 'power': 0.000133},
+    # (0.78125, 16, 29)   : {'area': 336.57, 'power': 0.0001925}
+
+    # *0.3 版
+    (0.78125, 8, 21)   : {'area': 176.90, 'power': 0.0000399},
+    (0.78125, 16, 29)   : {'area': 33.657, 'power': 0.0000575}
+
+}
+
+
+# CLK_PERIOD, NUM_INPUT, BIT
 # 有 which_OU, cluster_input, weight_bit_position, which_filter, Shift and Add 會需要
 Mux_base = {
 
@@ -418,6 +463,7 @@ Mux_base = {
 #     (7.8125,  512, 28) : {"area": 11589.933090, "power": 0.00041615},
 #     (14.0625, 512, 28) : {"area": 11589.933090, "power": 0.000285475},
 #     (26.5625, 512, 28) : {"area": 11589.933090, "power": 1.548e-04 }
+
 
 
 
@@ -672,3 +718,4 @@ Router ={
     (26.5625, 29) : {"area":  2859.721088, "power": 7.916e-05}
 }
 
+############################################
